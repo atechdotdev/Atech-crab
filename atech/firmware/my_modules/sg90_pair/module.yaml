@@ -1,0 +1,44 @@
+id: sg90_pair
+name: "Two SG90 servos on jumper wires"
+category: motor
+interface: gpio
+size: 1
+description: |
+  Not an Atech module: two hobby servos (SG90, MG90S or any 50 Hz PWM servo) wired
+  straight to one port with male-to-male jumpers. Servo 0 on Line A (pin 5), servo 1 on
+  Line B (pin 6); both share the port's +5V (pin 2) and GND (pin 4). Pin 1 next to +5V is
+  +12V: a red wire one pin over destroys the servo.
+  Each servo uses one of the ESP32-S3's 8 LEDC channels (50 Hz, 14-bit), so a project
+  takes 8 servos at most: 4 sg90_pair ports. The DC motor module uses LEDC channels too.
+
+driver:
+  header: sg90_pair.h
+  source: sg90_pair.cpp
+  class_name: Sg90Pair
+
+templates:
+  globals: |
+    Sg90Pair {{ instance }}({{ pin_a }}, {{ pin_b }});
+  setup: |
+    {{ instance }}.begin();
+  loop: ""
+
+actions:
+  - key: "{{ instance }}_set"
+    value_type: json
+    description: "Move the servos: {\"0\": deg, \"1\": deg} (0..180)."
+    handler: |
+      int a = value.indexOf("\"0\":"), b = value.indexOf("\"1\":");
+      if (a >= 0) {{ instance }}.write(0, value.substring(a + 4).toFloat());
+      if (b >= 0) {{ instance }}.write(1, value.substring(b + 4).toFloat());
+
+events: []
+lib_deps: []
+
+usage: |
+  // Two hobby servos on jumper wires: 0 = Line A, 1 = Line B. Angles 0..180 deg.
+  {{ instance }}.write(0, 90);          // servo on Line A to the middle
+  {{ instance }}.write(1, 45.5f);       // servo on Line B
+  {{ instance }}.writeUs(0, 1500);      // or the pulse width itself, 400..3000 us
+  {{ instance }}.detach(1);             // stop pulsing: the servo goes limp
+  float a = {{ instance }}.read(0);     // the last angle commanded (servos report nothing)

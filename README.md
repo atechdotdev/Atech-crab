@@ -20,6 +20,10 @@ ___
 
 ___
 
+> **Sesame on Atech:** this repository also has a version of Sesame with an Atech 14-port board as its brain:
+> the servos plug straight into the board, an Atech screen shows the face, and a motion sensor steers the walk.
+> Firmware, print files, assembly guide and video are in **[`atech/`](atech/README.md)**.
+
 **Greetings, from your new best friend.**
 
 Sesame is an accessible Open-Source robotics project based on the ESP32 microcontroller system, with an emphasis on expression and movement. 

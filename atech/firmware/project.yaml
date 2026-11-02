@@ -1,0 +1,228 @@
+name: sesame_atech
+board: 14port
+# Sesame (Dorian Todd's eight-servo quadruped, Apache-2.0) with an Atech 14-port board:
+# Atech Atelier's "Sesame walker" (Atelier 0.1.3). Sesame's frame, servos and legs are
+# unchanged; a deck in place of its top cover holds the board flat over the legs, its centre
+# 8 mm ahead of the hip axes. The servos (MG90S, 180 deg) plug straight into the ports on
+# jumper wires, two per port, run under the board through the spine:
+#   port 2: L1 (front-left hip) on Line A, L3 (its knee) on Line B
+#   port 3: R1 / R3 (front-right)    port 4: L2 / L4 (rear-left)    port 5: R2 / R4 (rear-right)
+# Red wires to the port's +5V, brown to GND, orange to the line. +12V is next to +5V:
+# check which end of the header is +12V on your board before you wire anything.
+# Feed the servos from a 5 V 3 A supply (Sesame's buck converter), grounds joined.
+# USB-C module on port 8. The screen sits on a cable from ports 10+11, upright in the front
+# visor, its connector edge down (the firmware turns the image 180 deg); the motion sensor
+# on port 13.
+modules_path: ./my_modules
+modules:
+  - {id: sg90_pair,  instance: fl,    port: 2}
+  - {id: sg90_pair,  instance: fr,    port: 3}
+  - {id: sg90_pair,  instance: bl,    port: 4}
+  - {id: sg90_pair,  instance: br,    port: 5}
+  - {id: st7735_tft, instance: face,  ports: [10, 11]}
+  - {id: icm40608,   instance: imu,   port: 13}
+code:
+  globals: |
+    // ---- the servos: Sesame's channel order, each on its port line ----
+    enum { R1, R2, L1, L2, R4, R3, L3, L4 };
+    static Sg90Pair* const PAIR[8] = {&fr, &br, &fl, &bl, &br, &fr, &fl, &bl};
+    static const uint8_t LINE[8]   = {0,   0,   0,   0,   1,   1,   1,   1};
+    static int8_t subtrim[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    static uint8_t servoDeg[8];
+    static int rawDeg[8];                 // what the move asked for, before steering
+    // Sesame's mapping: 0..180 deg -> 732..2929 us (its MIN_PULSE / MAX_PULSE)
+    static void writeServo(uint8_t ch, float deg) {
+      deg = constrain(deg + subtrim[ch], 0.0f, 180.0f);
+      servoDeg[ch] = (uint8_t)(deg + 0.5f);
+      PAIR[ch]->writeUs(LINE[ch], 732 + (int)(deg * (2929 - 732) / 180.0f + 0.5f));
+    }
+
+    // Steering. Sesame's walk on its own drifts to the left (in MuJoCo, on Sesame's own model
+    // too). While walking, the IMU's heading scales the hips' stroke: u > 0 lengthens the left
+    // hips' stroke and shortens the right ones', turning right. u = bias + kp * error + ki * its integral.
+    static bool steerOn = false;
+    static float steerU = 0.0f;
+    static const float STEER_KP = 4.0f, STEER_KI = 2.0f, STEER_BIAS = 0.15f;
+    static float steerI = 0.0f;
+    static const uint8_t HIP_CENTER[8] = {135, 45, 45, 135, 0, 0, 0, 0};
+    static const uint8_t HIP_LO[8] = {45, 0, 0, 45, 0, 0, 0, 0}, HIP_HI[8] = {180, 135, 135, 180, 0, 0, 0, 0};
+    static void steerHips() {
+      for (int ch = R1; ch <= L2; ch++) {
+        float sc = (ch == R1 || ch == R2) ? 1.0f - steerU : 1.0f + steerU;
+        float d = steerOn ? HIP_CENTER[ch] + (rawDeg[ch] - HIP_CENTER[ch]) * sc : rawDeg[ch];
+        writeServo(ch, constrain(d, (float)HIP_LO[ch], (float)HIP_HI[ch]));
+      }
+    }
+    static void setServoAngle(uint8_t ch, int deg) {
+      rawDeg[ch] = deg;
+      if (ch <= L2) steerHips(); else writeServo(ch, deg);
+    }
+
+    // ---- Sesame's moves as keyframes: {hold ms, n, servo, deg, servo, deg, ...}, ... , -1 ----
+    static const int16_t MOVE_REST[] = {300, 8, 0, 90, 1, 90, 2, 90, 3, 90, 4, 90, 5, 90, 6, 90, 7, 90, -1};
+    static const int16_t MOVE_STAND[] = {300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_WAVE[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 200, 4, 4, 80, 6, 180, 3, 90, 0, 100, 300, 1, 6, 180, 300, 1, 6, 180, 300, 1, 6, 100, 300, 1, 6, 180, 300, 1, 6, 100, 300, 1, 6, 180, 300, 1, 6, 100, 300, 1, 6, 180, 300, 1, 6, 100, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_DANCE[] = {300, 8, 0, 90, 1, 90, 2, 90, 3, 90, 4, 160, 5, 160, 6, 10, 7, 10, 300, 4, 4, 115, 5, 115, 6, 10, 7, 10, 300, 4, 4, 160, 5, 160, 6, 65, 7, 65, 300, 4, 4, 115, 5, 115, 6, 10, 7, 10, 300, 4, 4, 160, 5, 160, 6, 65, 7, 65, 300, 4, 4, 115, 5, 115, 6, 10, 7, 10, 300, 4, 4, 160, 5, 160, 6, 65, 7, 65, 300, 4, 4, 115, 5, 115, 6, 10, 7, 10, 300, 4, 4, 160, 5, 160, 6, 65, 7, 65, 300, 4, 4, 115, 5, 115, 6, 10, 7, 10, 300, 4, 4, 160, 5, 160, 6, 65, 7, 65, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_SWIM[] = {400, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 90, 5, 90, 6, 90, 7, 90, 400, 4, 0, 90, 1, 90, 2, 90, 3, 90, 400, 4, 0, 135, 1, 45, 2, 45, 3, 135, 400, 4, 0, 90, 1, 90, 2, 90, 3, 90, 400, 4, 0, 135, 1, 45, 2, 45, 3, 135, 400, 4, 0, 90, 1, 90, 2, 90, 3, 90, 400, 4, 0, 135, 1, 45, 2, 45, 3, 135, 400, 4, 0, 90, 1, 90, 2, 90, 3, 90, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_POINT[] = {2000, 8, 3, 90, 0, 135, 1, 100, 7, 180, 2, 25, 6, 145, 4, 80, 5, 170, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_PUSHUP[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 500, 4, 2, 0, 0, 180, 6, 90, 5, 90, 600, 2, 6, 0, 5, 180, 500, 2, 6, 90, 5, 90, 600, 2, 6, 0, 5, 180, 500, 2, 6, 90, 5, 90, 600, 2, 6, 0, 5, 180, 500, 2, 6, 90, 5, 90, 600, 2, 6, 0, 5, 180, 500, 2, 6, 90, 5, 90, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_BOW[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 600, 8, 2, 0, 0, 180, 6, 0, 5, 180, 3, 180, 1, 0, 4, 0, 7, 180, 3000, 2, 6, 90, 5, 90, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_CUTE[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 200, 8, 3, 160, 1, 20, 4, 180, 7, 0, 2, 0, 0, 180, 6, 180, 5, 0, 300, 2, 4, 180, 7, 45, 300, 2, 4, 135, 7, 0, 300, 2, 4, 180, 7, 45, 300, 2, 4, 135, 7, 0, 300, 2, 4, 180, 7, 45, 300, 2, 4, 135, 7, 0, 300, 2, 4, 180, 7, 45, 300, 2, 4, 135, 7, 0, 300, 2, 4, 180, 7, 45, 300, 2, 4, 135, 7, 0, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_FREAKY[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 200, 6, 2, 0, 0, 180, 3, 180, 1, 0, 4, 90, 5, 0, 400, 1, 5, 25, 400, 1, 5, 0, 400, 1, 5, 25, 400, 1, 5, 0, 400, 1, 5, 25, 400, 1, 5, 0, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_WORM[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 200, 8, 0, 180, 1, 0, 2, 0, 3, 180, 4, 90, 5, 90, 6, 90, 7, 90, 300, 4, 5, 45, 6, 135, 4, 45, 7, 135, 300, 4, 5, 135, 6, 45, 4, 135, 7, 45, 300, 4, 5, 45, 6, 135, 4, 45, 7, 135, 300, 4, 5, 135, 6, 45, 4, 135, 7, 45, 300, 4, 5, 45, 6, 135, 4, 45, 7, 135, 300, 4, 5, 135, 6, 45, 4, 135, 7, 45, 300, 4, 5, 45, 6, 135, 4, 45, 7, 135, 300, 4, 5, 135, 6, 45, 4, 135, 7, 45, 300, 4, 5, 45, 6, 135, 4, 45, 7, 135, 300, 4, 5, 135, 6, 45, 4, 135, 7, 45, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_SHAKE[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 200, 6, 0, 135, 2, 45, 6, 90, 5, 90, 3, 90, 1, 90, 300, 2, 4, 45, 7, 135, 300, 2, 4, 0, 7, 180, 300, 2, 4, 45, 7, 135, 300, 2, 4, 0, 7, 180, 300, 2, 4, 45, 7, 135, 300, 2, 4, 0, 7, 180, 300, 2, 4, 45, 7, 135, 300, 2, 4, 0, 7, 180, 300, 2, 4, 45, 7, 135, 300, 2, 4, 0, 7, 180, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_SHRUG[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 1000, 4, 5, 90, 4, 90, 6, 90, 7, 90, 1500, 4, 5, 0, 4, 180, 6, 180, 7, 0, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_DEAD[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 300, 4, 5, 90, 4, 90, 6, 90, 7, 90, -1};
+    static const int16_t MOVE_CRAB[] = {200, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, 300, 8, 0, 90, 1, 90, 2, 90, 3, 90, 4, 45, 5, 135, 6, 0, 7, 180, 300, 4, 4, 0, 5, 180, 6, 45, 7, 135, 300, 4, 4, 45, 5, 135, 6, 0, 7, 180, 300, 4, 4, 0, 5, 180, 6, 45, 7, 135, 300, 4, 4, 45, 5, 135, 6, 0, 7, 180, 300, 4, 4, 0, 5, 180, 6, 45, 7, 135, 300, 4, 4, 45, 5, 135, 6, 0, 7, 180, 300, 4, 4, 0, 5, 180, 6, 45, 7, 135, 300, 4, 4, 45, 5, 135, 6, 0, 7, 180, 300, 4, 4, 0, 5, 180, 6, 45, 7, 135, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_WALK[] = {100, 4, 5, 135, 6, 45, 1, 100, 2, 25, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 90, 4, 0, 0, 180, 100, 2, 1, 45, 2, 90, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 90, 2, 0, 100, 2, 3, 135, 0, 90, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_BACK[] = {100, 0, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 100, 2, 5, 135, 6, 0, 100, 4, 7, 135, 3, 135, 4, 0, 0, 90, 100, 2, 1, 90, 2, 0, 100, 2, 4, 45, 7, 180, 100, 4, 5, 180, 6, 45, 1, 45, 2, 90, 100, 2, 3, 90, 0, 180, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_LEFT[] = {100, 2, 5, 135, 7, 135, 100, 2, 0, 180, 3, 180, 100, 2, 5, 180, 7, 180, 100, 2, 0, 135, 3, 135, 100, 2, 4, 45, 6, 45, 100, 2, 1, 90, 2, 90, 100, 2, 4, 0, 6, 0, 100, 2, 1, 45, 2, 45, 100, 2, 5, 135, 7, 135, 100, 2, 0, 180, 3, 180, 100, 2, 5, 180, 7, 180, 100, 2, 0, 135, 3, 135, 100, 2, 4, 45, 6, 45, 100, 2, 1, 90, 2, 90, 100, 2, 4, 0, 6, 0, 100, 2, 1, 45, 2, 45, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t MOVE_RIGHT[] = {100, 2, 4, 45, 6, 45, 100, 2, 1, 0, 2, 0, 100, 2, 4, 0, 6, 0, 100, 2, 1, 45, 2, 45, 100, 2, 5, 135, 7, 135, 100, 2, 0, 90, 3, 90, 100, 2, 5, 180, 7, 180, 100, 2, 0, 135, 3, 135, 100, 2, 4, 45, 6, 45, 100, 2, 1, 0, 2, 0, 100, 2, 4, 0, 6, 0, 100, 2, 1, 45, 2, 45, 100, 2, 5, 135, 7, 135, 100, 2, 0, 90, 3, 90, 100, 2, 5, 180, 7, 180, 100, 2, 0, 135, 3, 135, 300, 8, 0, 135, 1, 45, 2, 45, 3, 135, 4, 0, 5, 180, 6, 0, 7, 180, -1};
+    static const int16_t* const MOVE_DATA[] = {MOVE_REST, MOVE_STAND, MOVE_WAVE, MOVE_DANCE, MOVE_SWIM, MOVE_POINT, MOVE_PUSHUP, MOVE_BOW, MOVE_CUTE, MOVE_FREAKY, MOVE_WORM, MOVE_SHAKE, MOVE_SHRUG, MOVE_DEAD, MOVE_CRAB, MOVE_WALK, MOVE_BACK, MOVE_LEFT, MOVE_RIGHT};
+    static const char* const MOVE_NAMES[] = {"rest", "stand", "wave", "dance", "swim", "point", "pushup", "bow", "cute", "freaky", "worm", "shake", "shrug", "dead", "crab", "walk", "back", "left", "right"};
+    static const uint8_t MOVE_MOOD[] = {0, 1, 2, 3, 2, 1, 5, 2, 3, 6, 6, 2, 4, 0, 5, 5, 5, 5, 5};
+    static const int NMOVES = 19;
+    static const uint8_t STAND[8] = {135, 45, 45, 135, 0, 180, 0, 180};
+    static int moveIndex(const char* n) { for (int i = 0; i < NMOVES; i++) if (!strcmp(n, MOVE_NAMES[i])) return i; return -1; }
+
+    // ---- the IMU: tilt and heading, for the face and the readout ----
+    static float rollF = 0, pitchF = 0, yaw = 0;
+    static void sense(float dt) {
+      float ax = imu.readAccelX(), ay = imu.readAccelY(), az = imu.readAccelZ();
+      float gx = imu.readGyroX() * DEG_TO_RAD, gy = imu.readGyroY() * DEG_TO_RAD, gz = imu.readGyroZ() * DEG_TO_RAD;
+      float rollA = atan2f(-ax, az), pitchA = atan2f(ay, sqrtf(ax * ax + az * az));
+      rollF = 0.97f * (rollF + gy * dt) + 0.03f * rollA;
+      pitchF = 0.97f * (pitchF + gx * dt) + 0.03f * pitchA;
+      yaw += gz * dt;
+    }
+
+    // ============================ the face (upright, in the visor) =================
+    // The screen stands upright at the front, its long side across: a landscape face.
+    // 0 asleep, 1 awake, 2 happy, 3 love, 4 surprised, 5 focused (walking), 6 dizzy
+    static void drawFace(int mood, float gx, float gy, float blink, float t) {
+      const uint16_t BG = 0x0841, EYE = 0xAFFF, PUPIL = 0x0841, PINK = 0xFB56, WARM = 0xFD20;
+      face.fillScreen(BG);
+      int ex[2] = {52, 108};
+      int ey = 34;
+      for (int e = 0; e < 2; e++) {
+        int x = ex[e] + (int)(gx * 8), y = ey + (int)(gy * 6);
+        if (mood == 0) {
+          face.fillRoundRect(x - 15, y + 4, 30, 5, 2, EYE);
+        } else if (mood == 2) {
+          face.fillCircle(x, y + 8, 15, EYE); face.fillCircle(x, y + 14, 14, BG); face.fillRect(x - 16, y + 8, 33, 14, BG);
+        } else if (mood == 3) {
+          int sz = 8 + (int)(2 * sinf(t * 12));
+          face.fillCircle(x - sz / 2, y - 2, sz / 2 + 1, PINK); face.fillCircle(x + sz / 2, y - 2, sz / 2 + 1, PINK);
+          face.fillTriangle(x - sz - 1, y, x + sz + 1, y, x, y + sz + 4, PINK);
+        } else if (mood == 4) {
+          face.fillCircle(x, y, 16, EYE); face.fillCircle(x, y, 6, PUPIL);
+        } else if (mood == 6) {
+          for (int r = 3; r <= 14; r += 4) {
+            float a0 = t * 9.0f + r * 0.5f;
+            face.drawCircle(x + (int)(2 * cosf(a0)), y + (int)(2 * sinf(a0)), r, EYE);
+          }
+        } else {
+          int h = max(4, (int)(36 * (1.0f - blink)));
+          if (mood == 5) h = min(h, 22);
+          face.fillRoundRect(x - 14, y - h / 2, 28, h, min(12, h / 2), EYE);
+          if (h > 12) { face.fillCircle(x + (int)(gx * 5), y + (int)(gy * 5), 6, PUPIL); face.fillCircle(x + (int)(gx * 5) - 2, y + (int)(gy * 5) - 2, 2, EYE); }
+          if (mood == 5) { int sg = e == 0 ? 1 : -1; face.fillTriangle(x - 15, y - 20 + 4 * sg, x + 15, y - 20 - 4 * sg, x + 14 * sg, y - 14, WARM); }
+        }
+      }
+      if (mood != 0 && mood != 6) { face.fillRoundRect(24, 56, 16, 6, 3, PINK); face.fillRoundRect(120, 56, 16, 6, 3, PINK); }
+      if (mood == 0) face.drawCircle(80, 64, 4, EYE);
+      else if (mood == 4) face.fillCircle(80, 66, 6, EYE);
+      else if (mood == 6) { face.drawLine(68, 66, 75, 61, EYE); face.drawLine(75, 61, 85, 69, EYE); face.drawLine(85, 69, 92, 64, EYE); }
+      else { face.fillCircle(80, 58, 9, EYE); face.fillRect(70, 48, 21, 11, BG); }
+      if (mood == 0) {
+        int zy = 22 - (int)(fmodf(t, 1.5f) * 6);
+        for (int k = 0; k < 2; k++) { int x0 = 130 + 9 * k, y0 = zy - 7 * k, w = 5 + 2 * k;
+          face.drawLine(x0, y0, x0 + w, y0, EYE); face.drawLine(x0 + w, y0, x0, y0 + w, EYE); face.drawLine(x0, y0 + w, x0 + w, y0 + w, EYE); }
+      }
+      face.display();
+    }
+
+    static void glowAll(uint8_t, uint8_t, uint8_t) {}
+  setup: |
+    face.setRotation(1);   // connector edge down in the visor
+    imu.calibrateGyro();
+    for (int i = 0; i < 8; i++) setServoAngle(i, STAND[i]);
+  loop: |
+    // A show: wake up, then Sesame's moves one after the other. `atech send spider_go <move>`
+    // plays one move now (rest, stand, wave, dance, walk, back, left, right, ...).
+    static const char* SHOW[] = {"stand", "wave", "walk", "left", "walk", "dance", "crab", "right",
+                                 "pushup", "cute", "bow", "shake", "stand"};
+    static const int NSHOW = sizeof(SHOW) / sizeof(SHOW[0]);
+    static int showAt = -1, move = -1;
+    static const int16_t* kf = nullptr;
+    static unsigned long nextKey = 0, t0 = millis(), moveStart = 0;
+    static EveryTimer faceT, report, senseT;
+    static String queued = "";
+    static float steerYaw0 = 0.0f;
+    static int turnRepeats = 0;
+    float t = (millis() - t0) / 1000.0f;
+
+    if (atech_action == "spider_go") {
+      if (moveIndex(atech_value.c_str()) >= 0) { queued = atech_value; atechDone(); }
+    }
+    if (senseT.ready(10)) {
+      sense(0.01f);
+      if (steerOn) {     // heading hold while walking
+        float e = yaw - steerYaw0;
+        steerI = constrain(steerI + e * 0.01f, -0.1f, 0.1f);
+        steerU = constrain(STEER_BIAS + STEER_KP * e + STEER_KI * steerI, -0.4f, 0.4f);
+        steerHips();
+      }
+    }
+
+    // pick the next move
+    if (kf == nullptr && millis() - t0 > 2500) {
+      int next = -1;
+      if (queued.length()) { next = moveIndex(queued.c_str()); queued = ""; }
+      else if (showAt + 1 < NSHOW) next = moveIndex(SHOW[++showAt]);
+      if (next >= 0) {
+        move = next; kf = MOVE_DATA[move]; nextKey = millis(); moveStart = millis();
+        steerOn = (move == moveIndex("walk"));
+        steerYaw0 = yaw; steerI = 0.0f;
+        Serial.printf("{\"type\":\"event\",\"payload\":{\"event_type\":\"state\",\"key\":\"spider_move\",\"value\":\"%s\"}}\n", MOVE_NAMES[move]);
+    #ifdef HAS_VOICE
+        if (move == moveIndex("wave") || move == moveIndex("dance")) voice.playRTTTL("hi:d=16,o=6,b=180:c,e,g,c7");
+        else voice.playNote(NOTE_G5, 60);
+    #endif
+      }
+    }
+    // play keyframes
+    while (kf != nullptr && (long)(millis() - nextKey) >= 0) {
+      if (kf[0] < 0) {
+        // a turn is done when the IMU has counted 90 degrees: play it again until then (6 units at most)
+        bool turn = move == moveIndex("left") || move == moveIndex("right");
+        if (turn && fabsf(yaw - steerYaw0) < radians(85) && ++turnRepeats < 6) { kf = MOVE_DATA[move]; continue; }
+        turnRepeats = 0;
+        kf = nullptr; steerOn = false; steerHips(); break;
+      }
+      int hold = kf[0], n = kf[1];
+      for (int i = 0; i < n; i++) setServoAngle(kf[2 + 2 * i], kf[3 + 2 * i]);
+      kf += 2 + 2 * n;
+      nextKey += hold;
+    }
+
+    if (faceT.ready(80)) {
+      float blink = (fmodf(t, 3.7f) < 0.15f) ? 1.0f : 0.0f;
+      int mood = (move < 0) ? ((t < 1.2f) ? 0 : 1) : MOVE_MOOD[move];
+      if (kf == nullptr && move >= 0) mood = 1;
+      bool tipped = fabsf(rollF) > 1.0f || fabsf(pitchF) > 1.0f;
+      if (tipped) mood = 4;
+      float gx = (mood == 1) ? 0.6f * sinf(t * 1.3f) : 0.0f;
+      drawFace(mood, gx, mood == 5 ? -0.3f : 0.0f, blink, t);
+      switch (mood) {
+        case 0: glowAll(0, 0, 10); break;
+        case 2: case 3: glowAll(51, 10, 30); break;
+        case 5: glowAll(0, 40, 20); break;
+        case 6: glowAll(30, 0, 40); break;
+        default: glowAll(10, 30, 40);
+      }
+    }
+    if (report.ready(100)) {
+      Serial.printf("{\"type\":\"event\",\"payload\":{\"event_type\":\"sensor\",\"key\":\"spider_state\",\"value\":{\"roll\":%.3f,\"pitch\":%.3f,\"yaw\":%.3f,\"deg\":[%d,%d,%d,%d,%d,%d,%d,%d]}}}\n",
+                    rollF, pitchF, yaw, servoDeg[0], servoDeg[1], servoDeg[2], servoDeg[3], servoDeg[4], servoDeg[5], servoDeg[6], servoDeg[7]);
+    }

@@ -2,3 +2,6 @@
 .idea/
 __pycache__/
 *.pyc
+# Atech SDK build output
+atech/firmware/build/
+__pycache__/
