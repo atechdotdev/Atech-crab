@@ -1,0 +1,26 @@
+Atech-crab
+Copyright 2026 Atech
+
+This product is a derivative of the Sesame Robot Project
+(https://github.com/dorianborian/sesame-robot), created by Dorian Todd,
+licensed under the Apache License, Version 2.0. It was obtained by way of
+https://github.com/seunyboyxu/New_Spyder, a fork of Sesame under the same
+licence.
+
+Changes made for Atech-crab (2026-11):
+  - atech/ (new): firmware for the Atech 14-port board, generated from Sesame's
+    firmware/movement-sequences.h; the sg90_pair servo module; a deck and lid
+    replacing Sesame's top cover (from Atech Atelier's "Sesame walker" design);
+    print-ready STLs and sliced print files; an assembly guide and video.
+  - README.md: an Atech-crab introduction added above Sesame's original README.
+  - .gitignore: the Atech SDK's build output.
+  - NOTICE (this file): new.
+All other files are Sesame's, unchanged.
+
+The Sesame parts in atech/print/stl/ (internal frame, bottom cover, legs) are
+Sesame's parts, taken from sesame-ml's model of Sesame
+(https://github.com/lukehollis/sesame-ml, Apache-2.0) and turned to their print
+orientation.
+
+"Sesame" is the name of Dorian Todd's project. It is used here only to say
+where Atech-crab comes from; Atech-crab is not made or endorsed by it.

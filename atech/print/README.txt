@@ -1,15 +1,15 @@
-SESAME ON ATECH - PRINT FILES (v3, 2026-11-02)
+ATECH-CRAB - PRINT FILES (v3, 2026-11-02)
 
 gcode/: sliced and checked, PLA Basic, Textured PEI plate, 0.4 mm nozzle, 0.20 mm
 layers, 2 walls, 15 % gyroid infill, tree supports from the build plate only, auto brim.
 
-  H2S   sesame_atech_pla_h2s.gcode.3mf          4 h 34 min   140 g   all 13 parts
-  H2D   sesame_atech_pla_h2d.gcode.3mf          4 h 45 min   140 g   all 13 parts
+  H2S   atech_crab_pla_h2s.gcode.3mf          4 h 34 min   140 g   all 13 parts
+  H2D   atech_crab_pla_h2d.gcode.3mf          4 h 45 min   140 g   all 13 parts
         (one nozzle: Bambu Studio's nozzle 1; the printer shows which before it starts)
-  X2D   sesame_atech_pla_x2d_plate1.gcode.3mf   3 h 07 min    98 g   6 parts
-        sesame_atech_pla_x2d_plate2.gcode.3mf   1 h 37 min    42 g   7 parts
-  P2S   sesame_atech_pla_p2s_plate1.gcode.3mf   3 h 41 min   118 g   8 parts
-        sesame_atech_pla_p2s_plate2.gcode.3mf   1 h 04 min    22 g   5 parts
+  X2D   atech_crab_pla_x2d_plate1.gcode.3mf   3 h 07 min    98 g   6 parts
+        atech_crab_pla_x2d_plate2.gcode.3mf   1 h 37 min    42 g   7 parts
+  P2S   atech_crab_pla_p2s_plate1.gcode.3mf   3 h 41 min   118 g   8 parts
+        atech_crab_pla_p2s_plate2.gcode.3mf   1 h 04 min    22 g   5 parts
 
 On a 256 mm bed (X2D, P2S) the parts need two plates: print both files.
 

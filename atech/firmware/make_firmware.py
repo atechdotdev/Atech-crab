@@ -92,7 +92,7 @@ def play(name: str, bodies: dict[str, str], walk_cycles: int = WALK_CYCLES) -> l
     return [(ms, f) for ms, f in frames if f or ms]
 
 
-MODULES_ATELIER = """name: sesame_atech
+MODULES_ATELIER = """name: atech_crab
 board: 14port
 # Sesame (Dorian Todd's eight-servo quadruped, Apache-2.0) with an Atech 14-port board:
 # Atech Atelier's "Sesame walker" (Atelier 0.1.3). Sesame's frame, servos and legs are

@@ -1,3 +1,30 @@
+# Atech-crab
+
+![License](https://img.shields.io/badge/License-APACHE2.0-yellow)
+![Board](https://img.shields.io/badge/Board-Atech%2014--port%20(ESP32--S3)-blue)
+
+![Atech-crab](atech/docs/img/cover.png)
+
+**Atech-crab** is [Sesame](https://github.com/dorianborian/sesame-robot), Dorian Todd's open-source walking
+robot, with an **Atech 14-port board** as its brain. The eight servos plug straight into the board's ports,
+an Atech screen shows the face, an Atech motion sensor keeps the walk on course, and the firmware is one
+`project.yaml` for the [Atech SDK](https://pypi.org/project/atech/) (`pip install atech`).
+
+**Start here: [`atech/`](atech/README.md)**: status, parts, print files for Bambu H2S, H2D, X2D and P2S,
+the assembly guide ([PDF](atech/docs/atech_crab_assembly.pdf), [video](atech/docs/atech_crab_assembly.mp4)),
+wiring and software.
+
+This repository is a fork of Sesame (by way of [seunyboyxu/New_Spyder](https://github.com/seunyboyxu/New_Spyder))
+and keeps all of it: the frame, legs, CAD, build guide and the moves in `firmware/movement-sequences.h`,
+which Atech-crab's firmware is generated from. Apache-2.0, like Sesame: see [`LICENSE`](LICENSE) and
+[`NOTICE`](NOTICE). Atech-crab is not made or endorsed by the Sesame project.
+
+---
+
+*The original Sesame README follows, unchanged.*
+
+---
+
 # The Sesame Robot Project 
 ___
 ![License](https://img.shields.io/badge/License-APACHE2.0-yellow)
@@ -19,10 +46,6 @@ ___
 </p>
 
 ___
-
-> **Sesame on Atech:** this repository also has a version of Sesame with an Atech 14-port board as its brain:
-> the servos plug straight into the board, an Atech screen shows the face, and a motion sensor steers the walk.
-> Firmware, print files, assembly guide and video are in **[`atech/`](atech/README.md)**.
 
 **Greetings, from your new best friend.**
 

@@ -1,4 +1,4 @@
-name: sesame_atech
+name: atech_crab
 board: 14port
 # Sesame (Dorian Todd's eight-servo quadruped, Apache-2.0) with an Atech 14-port board:
 # Atech Atelier's "Sesame walker" (Atelier 0.1.3). Sesame's frame, servos and legs are

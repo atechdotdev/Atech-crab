@@ -1,15 +1,15 @@
-# Sesame on Atech
+# Atech-crab
 
-![Sesame with an Atech 14-port board on its back](docs/img/cover.png)
+![Atech-crab: Sesame with an Atech 14-port board on its back](docs/img/cover.png)
 
-The same Sesame (frame, servos, legs and moves) with an **Atech 14-port board** as its brain. The servos
+Atech-crab is [Sesame](https://github.com/dorianborian/sesame-robot), Dorian Todd's open-source quadruped: the same frame, servos, legs and moves, with an **Atech 14-port board** as its brain. The servos
 plug straight into the board's ports on jumper wires, with no servo driver board. An Atech screen
 in a visor at the front shows Sesame's face, and an Atech motion sensor keeps the walk on course.
 
 Nothing under Sesame's top cover changes. The top cover is replaced by a **deck** that holds the board flat over
 the legs and a **lid** that closes it. Both come from Atech Atelier's "Sesame walker".
 
-[Assembly guide (PDF)](docs/sesame_atech_assembly.pdf) · [Assembly video (MP4, 33 s)](docs/sesame_atech_assembly.mp4)
+[Assembly guide (PDF)](docs/atech_crab_assembly.pdf) · [Assembly video (MP4, 33 s)](docs/atech_crab_assembly.mp4)
 
 ## Status
 
@@ -24,7 +24,7 @@ Print and test-fit the deck on the frame, with the servos in, before you print m
 
 ## What changes from Sesame
 
-| Sesame | Sesame on Atech |
+| Sesame | Atech-crab |
 |---|---|
 | ESP32 + distro board (or PCA9685) | Atech 14-port board (ESP32-S3). Servos on ports 2–5, two per port |
 | 128×64 OLED | Atech screen module, ports 10+11, in a front visor |
@@ -53,17 +53,17 @@ tree supports from the build plate only:
 
 | Printer | File(s) in [`print/gcode/`](print/gcode/) | Time |
 |---|---|---|
-| H2S | `sesame_atech_pla_h2s.gcode.3mf` | 4 h 34 min |
-| H2D | `sesame_atech_pla_h2d.gcode.3mf` | 4 h 45 min |
-| X2D | `sesame_atech_pla_x2d_plate1` + `_plate2` | 3 h 07 + 1 h 37 |
-| P2S | `sesame_atech_pla_p2s_plate1` + `_plate2` | 3 h 41 + 1 h 04 |
+| H2S | `atech_crab_pla_h2s.gcode.3mf` | 4 h 34 min |
+| H2D | `atech_crab_pla_h2d.gcode.3mf` | 4 h 45 min |
+| X2D | `atech_crab_pla_x2d_plate1` + `_plate2` | 3 h 07 + 1 h 37 |
+| P2S | `atech_crab_pla_p2s_plate1` + `_plate2` | 3 h 41 + 1 h 04 |
 
 Other printers: slice the STLs yourself, or run `print/slice.py` (it uses Bambu Studio's own printer
 profiles, so the start G-code is the printer's own) and `print/check.py`.
 
 ## Assemble
 
-The [PDF](docs/sesame_atech_assembly.pdf) has each step with pictures. In short:
+The [PDF](docs/atech_crab_assembly.pdf) has each step with pictures. In short:
 
 1. Build Sesame's base as in the [build guide](../docs/build-guide/README.md), but leave the bottom cover off.
 2. Glue deck part 2 under deck part 1 (the lip only fits one way).
@@ -154,12 +154,15 @@ atech/
 │   ├── sesame_atech_wired.py   the deck and lid (Atech Atelier, FreeCAD), with the wire openings
 │   └── review.png
 └── docs/
-    ├── sesame_atech_assembly.pdf
-    ├── sesame_atech_assembly.mp4
+    ├── atech_crab_assembly.pdf
+    ├── atech_crab_assembly.mp4
     └── img/
 ```
 
-## Credits
+## Licence and credits
+
+Apache-2.0, like Sesame: see [`LICENSE`](../LICENSE) and [`NOTICE`](../NOTICE).
+
 
 - **Sesame** by Dorian Todd ([dorianborian/sesame-robot](https://github.com/dorianborian/sesame-robot)),
   Apache-2.0: the frame, servos, legs and moves.

@@ -1,4 +1,4 @@
-"""Slice the Sesame-on-Atech parts for Bambu printers with the full system profiles.
+"""Slice the Atech-crab parts for Bambu printers with the full system profiles.
 
 Bambu keeps each printer's start/end G-code in separate "template" profiles. Loading
 only `Bambu Lab H2S 0.4 nozzle.json` into the CLI falls back to fdm_machine_common's
@@ -153,7 +153,7 @@ def slice_one(printer, fil, out_dir):
         plates = layout(machine, parts)
         for i, stls in enumerate(plates, 1):
             tag = f"_plate{i}" if len(plates) > 1 else ""
-            out = out_dir / f"sesame_atech_{fil}_{printer}{tag}.gcode.3mf"
+            out = out_dir / f"atech_crab_{fil}_{printer}{tag}.gcode.3mf"
             cmd = [str(CLI), "--arrange", "0", "--orient", "0", "--slice", "0",
                    "--load-settings", f"{paths['machine']};{paths['process']}",
                    "--load-filaments", str(paths["filament"]),
