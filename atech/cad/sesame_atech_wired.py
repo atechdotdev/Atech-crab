@@ -2,7 +2,8 @@
 
 Atelier 0.1.3's sesame_atech.py plus wire openings (2026-11-02): the USB-C opening
 reaches 5 mm lower, through the lid/deck seam; a slot at servo ports 2-5 and an
-SG90 lead notch under each. See the WIRE OPENINGS block.
+SG90 lead notch under each; and (v4, 2026-11-03) the same slots and notches on the
+other side, at ports 10-13. See the WIRE OPENINGS block.
 
 A remix of an open design. Sesame (Dorian Todd's quadruped, Apache-2.0)
 keeps everything below its top cover exactly as upstream prints it: the
@@ -209,12 +210,25 @@ SLOT_Z = (79.45, 86.65)
 LEAD_W, LEAD_Z0 = 8.0, 75.95
 
 
+# v4 (2026-11-03): the same openings on the -X side, at ports 10-13 (headers face -X),
+# so the leads can leave on either side. They cut the side wall only (x -38..-36): the
+# lid-screw boss at (-33.3, -2.5) stands 0.5 mm inside it, behind port 12's slot, and
+# port 12's lead notch sits 2 mm further back to clear it (the boss spans y -4.7..-0.3).
+PORT_Y_LEFT = {10: (-45.82, -30.18), 11: (-25.82, -10.18), 12: (-5.82, 9.82), 13: (14.18, 29.82)}
+X_OUT_LEFT, X_IN_LEFT = -45.0, -35.8
+LEAD_SHIFT_LEFT = {12: 2.0}
+
+
 def opening_boxes():
     out = [("usb", USB)]
     for n, (y0, y1) in PORT_Y.items():
         out.append(("port%d" % n, (X_IN, X_OUT, y0 - 0.5, y1 + 0.5) + SLOT_Z))
         yc = (y0 + y1) / 2
         out.append(("sg90_%d" % n, (X_IN, X_OUT, yc - LEAD_W / 2, yc + LEAD_W / 2, LEAD_Z0, SLOT_Z[0] + 0.1)))
+    for n, (y0, y1) in PORT_Y_LEFT.items():
+        out.append(("port%d" % n, (X_OUT_LEFT, X_IN_LEFT, y0 - 0.5, y1 + 0.5) + SLOT_Z))
+        yc = (y0 + y1) / 2 + LEAD_SHIFT_LEFT.get(n, 0.0)
+        out.append(("sg90_%d" % n, (X_OUT_LEFT, X_IN_LEFT, yc - LEAD_W / 2, yc + LEAD_W / 2, LEAD_Z0, SLOT_Z[0] + 0.1)))
     return out
 
 deck = cad.cut(deck, [box(*b) for _, b in opening_boxes()])

@@ -10,7 +10,7 @@ robot, with an **Atech 14-port board** as its brain. The eight servos plug strai
 an Atech screen shows the face, an Atech motion sensor keeps the walk on course, and the firmware is one
 `project.yaml` for the [Atech SDK](https://pypi.org/project/atech/) (`pip install atech`).
 
-**Start here: [`atech/`](atech/README.md)**: status, parts, print files for Bambu H2S, H2D, X2D and P2S,
+**Start here: [`atech/`](atech/README.md)**: status, parts, the [3D printing guide](atech/print/README.md) and print files for Bambu H2S, H2D, X2D and P2S,
 the assembly guide ([PDF](atech/docs/atech_crab_assembly.pdf), [video](atech/docs/atech_crab_assembly.mp4)),
 wiring and software.
 

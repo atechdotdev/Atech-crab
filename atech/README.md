@@ -18,7 +18,7 @@ the legs and a **lid** that closes it. Both come from Atech Atelier's "Sesame wa
 | Firmware (`firmware/project.yaml`) | Builds with the Atech SDK and runs on the SDK's emulated board: all modules start, every move plays |
 | Walking | Run in simulation (emulated board + MuJoCo): the motion sensor holds the walk within about 20° over ten cycles |
 | Servo driver (`sg90_pair`) | Has driven an SG90 on a real Atech 14-port board |
-| Deck and lid (v3) | Pass Atech Atelier's fit check in CAD. **Not yet printed or assembled** |
+| Deck and lid (v4) | Pass Atech Atelier's fit check in CAD. **Not yet printed or assembled** |
 
 Print and test-fit the deck on the frame, with the servos in, before you print more than one set.
 
@@ -48,18 +48,21 @@ male-to-male jumper wires · a 5 V 3 A supply for the servos · superglue (CA).
 
 ## Print
 
+**[3D printing guide](print/README.md)**: settings, every part and its orientation, and the wire openings.
+
 Sliced and checked for Bambu Lab printers, PLA Basic, Textured PEI plate, 0.4 mm nozzle, 0.20 mm layers,
 tree supports from the build plate only:
 
 | Printer | File(s) in [`print/gcode/`](print/gcode/) | Time |
 |---|---|---|
-| H2S | `atech_crab_pla_h2s.gcode.3mf` | 4 h 34 min |
-| H2D | `atech_crab_pla_h2d.gcode.3mf` | 4 h 45 min |
-| X2D | `atech_crab_pla_x2d_plate1` + `_plate2` | 3 h 07 + 1 h 37 |
+| H2S | `atech_crab_pla_h2s.gcode.3mf` | 4 h 35 min |
+| H2D | `atech_crab_pla_h2d.gcode.3mf` | 4 h 46 min |
+| X2D | `atech_crab_pla_x2d_plate1` + `_plate2` | 3 h 08 + 1 h 37 |
 | P2S | `atech_crab_pla_p2s_plate1` + `_plate2` | 3 h 41 + 1 h 04 |
 
-Other printers: slice the STLs yourself, or run `print/slice.py` (it uses Bambu Studio's own printer
-profiles, so the start G-code is the printer's own) and `print/check.py`.
+Other printers: slice the STLs yourself (the [guide](print/README.md) has the settings), or run
+`print/slice.py` (it uses Bambu Studio's own printer profiles, so the start G-code is the printer's own)
+and `print/check.py`.
 
 ## Assemble
 
@@ -83,7 +86,8 @@ The [PDF](docs/atech_crab_assembly.pdf) has each step with pictures. In short:
 | 5 | back right | R2 hip | R4 knee |
 
 Each port is a 6-pin header: 1 +12 V, 2 +5 V, 3 +3.3 V, 4 GND, 5 line A, 6 line B. Run the signal and GND
-jumpers out through the slot at each port. Power the servos from the 5 V supply (red to +, brown to −), and
+jumpers out through the slot at each port. Both sides have slots and lead notches (ports 2–5 on the right,
+10–13 on the left), so a lead can leave on either side. Power the servos from the 5 V supply (red to +, brown to −), and
 join the supply's − to a port's GND.
 
 > **+12 V sits next to +5 V, and which end of the header is pin 1 is not marked.** Measure before you wire:
@@ -149,9 +153,11 @@ atech/
 │   ├── stl/                    all 13 parts, print orientation
 │   ├── gcode/                  sliced for H2S, H2D, X2D, P2S (PLA)
 │   ├── slice.py, check.py      re-slice with Bambu Studio's profiles; check a sliced file
-│   └── README.txt
+│   └── README.md               the 3D printing guide
 ├── cad/
 │   ├── sesame_atech_wired.py   the deck and lid (Atech Atelier, FreeCAD), with the wire openings
+│   ├── cut_openings_left.py    the v4 left-side openings, cut into the print STLs
+│   ├── print_to_model.json     each print STL's place in the CAD frame
 │   └── review.png
 └── docs/
     ├── atech_crab_assembly.pdf
@@ -166,5 +172,5 @@ Apache-2.0, like Sesame: see [`LICENSE`](../LICENSE) and [`NOTICE`](../NOTICE).
 
 - **Sesame** by Dorian Todd ([dorianborian/sesame-robot](https://github.com/dorianborian/sesame-robot)),
   Apache-2.0: the frame, servos, legs and moves.
-- **Deck and lid**: Atech Atelier's "Sesame walker" 0.1.3, with wire openings added (v3).
+- **Deck and lid**: Atech Atelier's "Sesame walker" 0.1.3, with wire openings added on both sides (v4).
 - **Firmware**: built with the [Atech SDK](https://github.com/atechdotdev/python-sdk).
